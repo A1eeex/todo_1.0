@@ -1,9 +1,11 @@
+/* eslint-disable indent */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useRef } from 'react';
-import ch from 'classnames';
+import cn from 'classnames';
 import { useEffect, useState } from 'react';
 import * as api from './todos';
 import { Todo } from './types/Todo';
+import { FilterTodosType } from './types/FilterTodos';
 
 export const App: React.FC = () => {
   const [todos, setTodos] = useState<Todo[]>([]);
@@ -12,13 +14,31 @@ export const App: React.FC = () => {
   const [queryChangeTodo, setQueryChangeTodo] = useState<string>('');
   const normalizeQueryChangeTodo = queryChangeTodo.trim();
   const normalizeQuery = query.trim();
+  const [filterTodo, setFilterTodo] = useState(FilterTodosType.All);
 
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  console.log(queryChangeTodo);
+
+  const filterOptions = [
+    { type: FilterTodosType.All, label: FilterTodosType.All },
+    { type: FilterTodosType.Active, label: FilterTodosType.Active },
+    { type: FilterTodosType.Completed, label: FilterTodosType.Completed },
+  ];
+
   useEffect(() => {
     api.getAll().then(setTodos);
   }, []);
+
+  const filteredTodos = todos.filter((todo) => {
+    switch (filterTodo) {
+      case FilterTodosType.Active:
+        return !todo.completed;
+      case FilterTodosType.Completed:
+        return todo.completed;
+      default:
+        return todos;
+    }
+  });
 
   const handlerSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -34,8 +54,8 @@ export const App: React.FC = () => {
   const hanlerDeleteTodo = async (todoId: string) => {
     try {
       const getTodo = todos.filter((todd) => todd.id !== todoId);
-      setTodos(getTodo);
       await api.deleteOne(todoId);
+      setTodos(getTodo);
     } catch (error: unknown) {
       console.error('error =>', (error as Error).message);
     }
@@ -49,7 +69,7 @@ export const App: React.FC = () => {
   const handleUpdateTodo = async (
     event: React.FormEvent,
     todoId: string,
-    complited: boolean,
+    completed: boolean,
   ) => {
     event.preventDefault();
     try {
@@ -60,7 +80,7 @@ export const App: React.FC = () => {
       const updatedTodo: Todo = {
         id: todoId,
         title: normalizeQueryChangeTodo,
-        complited: complited,
+        completed: completed,
       };
 
       if (normalizeQueryChangeTodo.length === 0) {
@@ -78,7 +98,7 @@ export const App: React.FC = () => {
   // const handleOnBlurChangeTodo = async (
   //   event: React.FormEvent,
   //   todoId: string,
-  //   complited: boolean,
+  //   completed: boolean,
   // ) => {
   //   event.preventDefault();
   //   try {
@@ -89,7 +109,7 @@ export const App: React.FC = () => {
   //     const updatedTodo: Todo = {
   //       id: todoId,
   //       title: normalizeQueryChangeTodo,
-  //       complited: complited,
+  //       completed: completed,
   //     };
   //     await api.updateTodo(updatedTodo);
   //     setTodoEditId(null);
@@ -98,6 +118,56 @@ export const App: React.FC = () => {
   //     console.error('error =>', (error as Error).message);
   //   }
   // };
+
+  const handleCompliteTodo = async (todoId: string) => {
+    const updatedTodos = await Promise.all(
+      todos.map(async (todo) => {
+        if (todo.id === todoId) {
+          const updatedTodo: Todo = {
+            ...todo,
+            completed: !todo.completed,
+          };
+          await api.updateTodo(updatedTodo);
+          return updatedTodo;
+        }
+        return todo;
+      }),
+    );
+
+    setTodos(updatedTodos);
+  };
+
+  const handlerToggleAll = async () => {
+    try {
+      const allCompleted = todos.every((todo) => todo.completed === true);
+
+      await Promise.all(
+        todos.map(async (todo) => {
+          await api.updateTodo({ ...todo, completed: !allCompleted });
+        }),
+      );
+      setTodos((prevTodos) =>
+        prevTodos.map((todo) => ({ ...todo, completed: !allCompleted })),
+      );
+    } catch (error) {
+      console.error('Error updating todos:', error);
+    }
+  };
+
+  const handlerClearCompletedTodo = async () => {
+    const completedTodos = todos.filter((todo) => todo.completed);
+    try {
+      const deletionPromises = completedTodos.map((todo) =>
+        hanlerDeleteTodo(todo.id),
+      );
+      await Promise.all(deletionPromises);
+
+      const updatedTodos = todos.filter((todo) => !todo.completed);
+      setTodos(updatedTodos);
+    } catch (error: unknown) {
+      console.error('error =>', (error as Error).message);
+    }
+  };
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -113,11 +183,10 @@ export const App: React.FC = () => {
     }
   }, [todoEditId, todos]);
 
-  console.log(todos);
   return (
     <div className="todoapp">
       <header className="header">
-        <h1>todos</h1>
+        <h1>Todos</h1>
 
         <form onSubmit={handlerSubmit}>
           <input
@@ -138,77 +207,96 @@ export const App: React.FC = () => {
           className="toggle-all"
           data-cy="toggleAll"
         />
-        <label htmlFor="toggle-all">Mark all as complete</label>
+        <label onClick={() => handlerToggleAll()} htmlFor="toggle-all">
+          Mark all as complete
+        </label>
 
         <ul className="todo-list" data-cy="todoList">
-          {todos.length > 0 &&
-            todos.map((todo) => (
-              <li
-                onDoubleClick={() => handleDoubleClickTodo(todo.id, todo.title)}
-                className={ch({
-                  editing: todo.id === todoEditId && todoEditId !== null,
-                })}
-                key={todo.id}
-              >
-                <div className="view">
-                  <input type="checkbox" className="toggle" id="toggle-view" />
-                  <label htmlFor="toggle-view">{todo.title}</label>
-                  <button
-                    onClick={() => hanlerDeleteTodo(todo.id)}
-                    type="button"
-                    className="destroy"
-                    data-cy="deleteTodo"
-                  />
-                </div>
-
-                <form
-                  onSubmit={(e) => handleUpdateTodo(e, todo.id, todo.complited)}
+          {filteredTodos.length > 0 ? (
+            <>
+              {filteredTodos.map((todo) => (
+                <li
+                  onDoubleClick={() =>
+                    handleDoubleClickTodo(todo.id, todo.title)
+                  }
+                  className={cn({
+                    editing: todo.id === todoEditId && todoEditId !== null,
+                    completed: todo.completed,
+                  })}
+                  key={todo.id}
                 >
-                  <input
-                    onChange={(e) => setQueryChangeTodo(e.target.value)}
-                    value={queryChangeTodo}
-                    type="text"
-                    className="edit"
-                    ref={todo.id === todoEditId ? inputRef : undefined}
-                    onBlur={(e) => handleUpdateTodo(e, todo.id, todo.complited)}
-                  />
-                </form>
-              </li>
-            ))}
+                  <div className="view">
+                    <input
+                      onChange={() => handleCompliteTodo(todo.id)}
+                      checked={todo.completed}
+                      type="checkbox"
+                      className="toggle"
+                      id={`toggle-view${todo.id}`}
+                    />
+                    <label htmlFor="toggle-view">{todo.title}</label>
+                    <button
+                      onClick={() => hanlerDeleteTodo(todo.id)}
+                      type="button"
+                      className="destroy"
+                      data-cy="deleteTodo"
+                    />
+                  </div>
 
-          {/* <li className="completed">
-            <div className="view">
-              <input type="checkbox" className="toggle" id="toggle-completed" />
-              <label htmlFor="toggle-completed">qwertyuio</label>
-              <button type="button" className="destroy" data-cy="deleteTodo" />
-            </div>
-            <input type="text" className="edit" />
-          </li> */}
+                  <form
+                    onSubmit={(e) =>
+                      handleUpdateTodo(e, todo.id, todo.completed)
+                    }
+                  >
+                    <input
+                      onChange={(e) => setQueryChangeTodo(e.target.value)}
+                      value={queryChangeTodo}
+                      type="text"
+                      className="edit"
+                      ref={todo.id === todoEditId ? inputRef : undefined}
+                      onBlur={(e) =>
+                        handleUpdateTodo(e, todo.id, todo.completed)
+                      }
+                    />
+                  </form>
+                </li>
+              ))}
+            </>
+          ) : (
+            <>
+              <li className={'empty-todo'}>Pleas add some todo</li>
+            </>
+          )}
         </ul>
       </section>
 
       <footer className="footer">
-        <span className="todo-count" data-cy="todosCounter">
-          3 items left
+        <span
+          className={cn('todo-count', {
+            'hidden': filteredTodos.length=== 0
+          })}
+          data-cy="todosCounter"
+        >
+          {`${filteredTodos.length} items left`}
         </span>
 
         <ul className="filters">
-          <li>
-            <a href="#/" className="selected">
-              All
-            </a>
-          </li>
-
-          <li>
-            <a href="#/active">Active</a>
-          </li>
-
-          <li>
-            <a href="#/completed">Completed</a>
-          </li>
+          {filterOptions.map((option) => (
+            <li key={option.type} onClick={() => setFilterTodo(option.type)}>
+              <a
+                href={`#/${option.type}`}
+                className={filterTodo === option.type ? 'selected' : ''}
+              >
+                {option.label}
+              </a>
+            </li>
+          ))}
         </ul>
 
-        <button type="button" className="clear-completed">
+        <button
+          onClick={() => handlerClearCompletedTodo()}
+          type="button"
+          className="clear-completed"
+        >
           Clear completed
         </button>
       </footer>

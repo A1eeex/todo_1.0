@@ -21,7 +21,7 @@ export async function createTodo(title: string): Promise<Todo> {
   return response.data;
 }
 
-export async function updateTodo({ title, complited, id}: Todo): Promise<Todo> {
-  const response = await axios.put(`/todos/${id}`, { title, complited});
+export async function updateTodo({ title, completed, id}: Todo): Promise<Todo> {
+  const response = await axios.put(`/todos/${id}`, { title, completed});
   return response.data;
 }
