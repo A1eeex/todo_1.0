@@ -8,6 +8,7 @@ import { Todo } from './types/Todo';
 import { FilterTodosType } from './types/FilterTodos';
 
 export const App: React.FC = () => {
+  const [errorMessage, serErrorMessage] = useState<string>('');
   const [todos, setTodos] = useState<Todo[]>([]);
   const [todoEditId, setTodoEditId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
@@ -15,7 +16,6 @@ export const App: React.FC = () => {
   const normalizeQueryChangeTodo = queryChangeTodo.trim();
   const normalizeQuery = query.trim();
   const [filterTodo, setFilterTodo] = useState(FilterTodosType.All);
-
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -25,8 +25,19 @@ export const App: React.FC = () => {
     { type: FilterTodosType.Completed, label: FilterTodosType.Completed },
   ];
 
+  const loadTodos = async () => {
+    try {
+      const todosData = await api.getAll();
+
+      setTodos(todosData);
+    } catch (error) {
+      console.log(error);
+      serErrorMessage('Sorry, we have some problem with server');
+    }
+  };
+
   useEffect(() => {
-    api.getAll().then(setTodos);
+    loadTodos();
   }, []);
 
   const filteredTodos = todos.filter((todo) => {
@@ -95,30 +106,6 @@ export const App: React.FC = () => {
     }
   };
 
-  // const handleOnBlurChangeTodo = async (
-  //   event: React.FormEvent,
-  //   todoId: string,
-  //   completed: boolean,
-  // ) => {
-  //   event.preventDefault();
-  //   try {
-  //     const todo: Todo | undefined = todos.find((todo) => todo.id === todoId);
-  //     if (todo) {
-  //       Object.assign(todo, { title: queryChangeTodo });
-  //     }
-  //     const updatedTodo: Todo = {
-  //       id: todoId,
-  //       title: normalizeQueryChangeTodo,
-  //       completed: completed,
-  //     };
-  //     await api.updateTodo(updatedTodo);
-  //     setTodoEditId(null);
-  //     setIsEditing(false);
-  //   } catch (error: unknown) {
-  //     console.error('error =>', (error as Error).message);
-  //   }
-  // };
-
   const handleCompliteTodo = async (todoId: string) => {
     const updatedTodos = await Promise.all(
       todos.map(async (todo) => {
@@ -141,11 +128,15 @@ export const App: React.FC = () => {
     try {
       const allCompleted = todos.every((todo) => todo.completed === true);
 
-      await Promise.all(
-        todos.map(async (todo) => {
-          await api.updateTodo({ ...todo, completed: !allCompleted });
-        }),
+      const todosToUpdate = todos.filter((todo) =>
+        allCompleted ? todo.completed : !todo.completed,
       );
+      console.log(todosToUpdate);
+
+      await api.updateAllTodos(
+        todosToUpdate.map((todo) => ({ ...todo, completed: !allCompleted })),
+      );
+
       setTodos((prevTodos) =>
         prevTodos.map((todo) => ({ ...todo, completed: !allCompleted })),
       );
@@ -157,11 +148,12 @@ export const App: React.FC = () => {
   const handlerClearCompletedTodo = async () => {
     const completedTodos = todos.filter((todo) => todo.completed);
     try {
-      const deletionPromises = completedTodos.map((todo) =>
-        hanlerDeleteTodo(todo.id),
-      );
-      await Promise.all(deletionPromises);
+      // const deletionPromises = completedTodos.map((todo) =>
+      // hanlerDeleteTodo(todo.id),
 
+      // );
+      // await Promise.all(deletionPromises);
+      await api.deleteAll(completedTodos);
       const updatedTodos = todos.filter((todo) => !todo.completed);
       setTodos(updatedTodos);
     } catch (error: unknown) {
@@ -207,11 +199,13 @@ export const App: React.FC = () => {
           className="toggle-all"
           data-cy="toggleAll"
         />
-        <label onClick={() => handlerToggleAll()} htmlFor="toggle-all">
+
+        <label onClick={handlerToggleAll} htmlFor="toggle-all">
           Mark all as complete
         </label>
 
         <ul className="todo-list" data-cy="todoList">
+          {!!errorMessage && <li className={'error-todo'}>{errorMessage}</li>}
           {filteredTodos.length > 0 ? (
             <>
               {filteredTodos.map((todo) => (
@@ -263,7 +257,9 @@ export const App: React.FC = () => {
             </>
           ) : (
             <>
-              <li className={'empty-todo'}>Pleas add some todo</li>
+              {!!errorMessage === false && (
+                <li className={'empty-todo'}>Pleas add some todo</li>
+              )}
             </>
           )}
         </ul>
@@ -272,7 +268,7 @@ export const App: React.FC = () => {
       <footer className="footer">
         <span
           className={cn('todo-count', {
-            'hidden': filteredTodos.length=== 0
+            hidden: filteredTodos.length === 0,
           })}
           data-cy="todosCounter"
         >

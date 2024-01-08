@@ -16,6 +16,11 @@ export async function deleteOne(todoId: string): Promise<string> {
   return response.statusText;
 }
 
+export async function deleteAll(items: Todo[]): Promise<Todo> {
+  const response = await axios.patch('todos/?action=delete', {ids : items.map(item => item.id)});
+  return response.data;
+}
+
 export async function createTodo(title: string): Promise<Todo> {
   const response = await axios.post('/todos/', { title});
   return response.data;
@@ -23,5 +28,10 @@ export async function createTodo(title: string): Promise<Todo> {
 
 export async function updateTodo({ title, completed, id}: Todo): Promise<Todo> {
   const response = await axios.put(`/todos/${id}`, { title, completed});
+  return response.data;
+}
+
+export async function updateAllTodos(items: Todo[]): Promise<Todo> {
+  const response = await axios.patch('/todos?action=update', {items});
   return response.data;
 }
