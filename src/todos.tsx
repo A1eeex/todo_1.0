@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { Todo } from './types/Todo';
 
-axios.defaults.baseURL = 'http://localhost:3005';
+axios.defaults.baseURL = process.env.REACT_APP_BASE_URL;
 export function getAll(): Promise<Todo[]> {
   return axios.get('/todos').then((res) => res.data);
 }
