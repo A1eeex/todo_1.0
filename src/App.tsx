@@ -131,7 +131,7 @@ export const App: React.FC = () => {
       const todosToUpdate = todos.filter((todo) =>
         allCompleted ? todo.completed : !todo.completed,
       );
-      console.log(todosToUpdate);
+      // console.log(todosToUpdate);
 
       await api.updateAllTodos(
         todosToUpdate.map((todo) => ({ ...todo, completed: !allCompleted })),
